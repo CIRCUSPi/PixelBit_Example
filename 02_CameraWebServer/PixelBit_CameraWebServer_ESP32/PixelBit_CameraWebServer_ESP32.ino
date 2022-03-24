@@ -22,8 +22,9 @@
 
 #include "camera_pins.h"
 
-const char* ssid = "iCShop_SP";
-const char* password = "spring66chen";
+const char* ssid = "*********";
+const char* password = "*********";
+
 
 void startCameraServer();
 
