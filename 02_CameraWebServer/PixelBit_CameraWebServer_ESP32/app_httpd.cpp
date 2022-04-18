@@ -20,6 +20,13 @@
 //#include "camera_index.h"
 #include "sdkconfig.h"
 #include "camera_index.h"
+#include <esp_idf_version.h>
+
+#if ESP_IDF_VERSION_MAJOR <= 3
+// Notice: face detecion and recognition NOT supported in Arduino-ESP32 v2.0.x
+#define CONFIG_ESP_FACE_DETECT_ENABLED        1
+#define CONFIG_ESP_FACE_RECOGNITION_ENABLED   1
+#endif
 
 #if defined(ARDUINO_ARCH_ESP32) && defined(CONFIG_ARDUHAL_ESP_LOG)
 #include "esp32-hal-log.h"
