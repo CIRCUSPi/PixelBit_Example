@@ -103,14 +103,12 @@ void setup() {
  
 void loop() {
   camera_fb_t *fb = NULL;
-  esp_err_t res = ESP_OK;
   fb = esp_camera_fb_get();
   if(!fb){
     Serial.println("Camera capture failed");
     esp_camera_fb_return(fb);
     return;
   }
-  size_t fb_len = 0;
   if(fb->format != PIXFORMAT_JPEG){
     Serial.println("Non-JPEG data not implemented");
     return;
