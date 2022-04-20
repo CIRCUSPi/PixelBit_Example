@@ -350,6 +350,10 @@ void setup() {
 
 
 void loop() {
+#if ESP_IDF_VERSION_MAJOR <= 3
+  serialRead();
+#endif
+
   if (stringComplete) {
     // clear the string:
     inputString = "";
@@ -362,7 +366,12 @@ void loop() {
   routine is run between each time loop() runs, so using delay inside loop can
   delay response. Multiple bytes of data may be available.
 */
-void serialEvent() {
+#if ESP_IDF_VERSION_MAJOR >= 4
+void serialEvent()
+#elif ESP_IDF_VERSION_MAJOR <= 3
+void serialRead()
+#endif
+{
   while (Serial.available()) {
     // get the new byte:
     char inChar = (char)Serial.read();
