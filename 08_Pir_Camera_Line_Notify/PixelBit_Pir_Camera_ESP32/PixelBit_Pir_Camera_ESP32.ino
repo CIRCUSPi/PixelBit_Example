@@ -46,9 +46,9 @@ void pir_idle(void)
     pir_trig_state = false;
 }
 
-#define SSID "iCShop_SP"
-#define PASSWORD "spring66chen"
-#define LINE_TOKEN "CEl07kKWnNWRathj5ZWiNwzisYkA4kIVhEdgRJ4FTJd"
+#define SSID "xxxxxxxx"
+#define PASSWORD "xxxxxxxx"
+#define LINE_TOKEN "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 
 // Command Handler
 CMD_T cmd_list[] = {
