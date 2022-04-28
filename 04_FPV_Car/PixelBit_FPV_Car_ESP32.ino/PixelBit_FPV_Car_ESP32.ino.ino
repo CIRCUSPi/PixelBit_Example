@@ -17,8 +17,15 @@
 #include "esp_http_server.h"
 #include <tca5405.h>
 #include "config.h"
+#include <TFT_eSPI.h>
+#include "qrcode.h"
 
+TFT_eSPI tft = TFT_eSPI();
 TCA5405 tca5405;
+
+// Create the QR code
+QRCode qrcode;
+char qrcode_str[128];
 
 //
 // WARNING!!! PSRAM IC required for UXGA resolution and high JPEG quality
@@ -40,9 +47,10 @@ TCA5405 tca5405;
 
 #include "camera_pins.h"
 
+
 // Replace with your network credentials
-const char* ssid = "PixelBit";
-const char* password = "circuspi";
+const char* ssid = WIFI_SSID;
+const char* password = WIFI_PASS;
 
 #define PART_BOUNDARY "123456789000000000000987654321"
 
@@ -201,7 +209,6 @@ static esp_err_t cmd_handler(httpd_req_t *req){
     return ESP_FAIL;
   }
 
-  sensor_t * s = esp_camera_sensor_get();
   int res = 0;
   
   if(!strcmp(variable, "forward")) {
@@ -267,6 +274,25 @@ void startCameraServer(){
 String inputString = "";         // a String to hold incoming data
 bool stringComplete = false;  // whether the string is complete
 
+void draw_qrcode() {
+  const int offset_x = 18;
+  const int offset_y = 4;
+  const int scale = 7;
+  
+  for (int y = 0; y < qrcode.size; y++) {
+    for (int x = 0; x < qrcode.size; x++) {
+      int newX = offset_x + (x * scale);
+      int newY = offset_y + (y * scale);
+
+      if (qrcode_getModule(&qrcode, x, y)) {
+        tft.fillRect(newX, newY, scale, scale, TFT_BLACK);
+      } else {
+        tft.fillRect(newX, newY, scale, scale, TFT_WHITE);
+      }
+    }
+  }
+}
+
 void setup() {
 //  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout detector
 
@@ -284,6 +310,19 @@ void setup() {
   Serial.begin(UART_BAUDRATE);
   // reserve 200 bytes for the inputString:
   inputString.reserve(UART_BUFFER);
+
+  // Initialise the TFT
+  tft.begin();
+  tft.setSwapBytes(true);
+  tft.fillScreen(TFT_WHITE);
+  tft.setRotation(3);
+  
+  tft.setTextSize(1);
+  tft.setTextColor(TFT_BLUE, TFT_WHITE);
+  
+  sprintf(qrcode_str, "WIFI:S:%s;T:WPA;P:%s;;", ssid, password);
+  uint8_t qrcodeData[qrcode_getBufferSize(QRCODE_VERSION)];
+  qrcode_initText(&qrcode, qrcodeData, QRCODE_VERSION, ECC_LOW, qrcode_str);
   
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
@@ -327,25 +366,34 @@ void setup() {
   s->set_hmirror(s, 1);
   
   // Wi-Fi connection
-#if WIFI_STA_MODE
+#if (WIFI_MODE == WIFI_STA_MODE)
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
+  IPAddress myIP = WiFi.localIP();
   Serial.println("");
   Serial.println("WiFi connected");
   
   Serial.print("Camera Stream Ready! Go to: http://");
-  Serial.println(WiFi.localIP());
-#else 
+  
+#elif (WIFI_MODE == WIFI_AP_MODE)
   WiFi.softAP(ssid, password);
   IPAddress myIP = WiFi.softAPIP();
   Serial.print("AP IP address: ");
-  Serial.println(myIP);
+  
+#else
+  ### ERROR: Please check wifi mode setting
 #endif
+  Serial.println(myIP);
   // Start streaming web server
   startCameraServer();
+  
+  draw_qrcode();
+  char ip_str[16];
+  sprintf(ip_str, "%d.%d.%d.%d", myIP[0], myIP[1], myIP[2], myIP[3]);
+  tft.drawString(ip_str, 30, 210, 4);
 }
 
 
