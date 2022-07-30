@@ -82,7 +82,7 @@ void setup() {
   s->set_contrast(s, 1);
   s->set_saturation(s, 1);
 
-  // Initialise the TFT
+  // Initialize the TFT
   tft.init();
   tft.setRotation(3);
   tft.fillScreen(TFT_BLACK);

@@ -311,7 +311,7 @@ void setup() {
   // reserve 200 bytes for the inputString:
   inputString.reserve(UART_BUFFER);
 
-  // Initialise the TFT
+  // Initialize the TFT
   tft.begin();
   tft.setSwapBytes(true);
   tft.fillScreen(TFT_WHITE);

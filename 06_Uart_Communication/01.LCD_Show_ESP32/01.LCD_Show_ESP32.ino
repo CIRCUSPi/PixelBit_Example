@@ -2,7 +2,7 @@
 TFT_eSPI tft = TFT_eSPI();
 
 void setup() {
-  // Initialise the TFT
+  // Initialize the TFT
   tft.init();
   tft.setRotation(3);
   tft.fillScreen(TFT_BLACK);

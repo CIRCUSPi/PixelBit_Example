@@ -7,7 +7,7 @@ void setup() {
   // initialize serial:
   Serial.begin(57600);
 
-  // Initialise the TFT
+  // Initialize the TFT
   tft.init();
   tft.setRotation(3);
   tft.fillScreen(TFT_BLACK);
