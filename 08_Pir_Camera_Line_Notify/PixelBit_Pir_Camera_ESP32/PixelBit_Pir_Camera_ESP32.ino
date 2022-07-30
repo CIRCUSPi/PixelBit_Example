@@ -54,7 +54,7 @@ void pir_idle(void)
 CMD_T cmd_list[] = {
      {ATM_EVN_PIR_TRIG, strlen(ATM_EVN_PIR_TRIG), &pir_trig},
      {ATM_EVN_PIR_IDLE, strlen(ATM_EVN_PIR_IDLE), &pir_idle},
-     {NULL,             0,                        NULL     }  //  keep this elemnet in the end of list
+     {NULL,             0,                        NULL     }  //  keep this element in the end of list
 };
 
 void setup()
