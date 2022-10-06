@@ -1,69 +1,74 @@
+/**
+ * @file PixelBit_Tetris_ESP32.ino
+ * @author Zack Huang (zackhuang0513@gmail.com)
+ * @brief PixelBit Tetris Game
+ * @version 1.0.0
+ * @date 2022-10-06
+ *
+ * @copyright Copyright (c) 2022
+ *
+ */
+/* #region  include */
 #include "CircusUart.h"
 #include "config.h"
 #include "tet.h"
 #include <SPI.h>
 #include <TFT_eSPI.h>
 #include <TJpg_Decoder.h>
+/* #endregion */
 
-TFT_eSPI tft = TFT_eSPI();
+/* #region  buff */
+uint16_t BlockImage[Block_NUM][Block_SIEZ][Block_SIEZ];     // 8 種積 Pixel，包含分隔線
+uint16_t backBuffer[Height * Length][Width * Length];       // 遊戲區塊 Pixel，[Height*Length][Width*Length]
+int      screen[Width][Height] = {0};                       // 存放積木區塊顏色 index (積木格數)
+/* #endregion */
 
-uint16_t  BlockImage[8][12][12];           // Block
-uint16_t  backBuffer[220][165];            // GAME AREA
-const int Length                = 11;      // the number of pixels for a side of a block
-const int Width                 = 15;      // the number of horizontal blocks
-const int Height                = 20;      // the number of vertical blocks
-int       screen[Width][Height] = {0};     // it shows color-numbers of all positions
-
-struct Point {
-    int X, Y;
+/* #region  建立 7 個積木形狀、各種方向、顏色 index */
+Block_t blocks[7] = {
+     {{{{-1, 0}, {0, 0}, {1, 0}, {2, 0}}, {{0, -1}, {0, 0}, {0, 1}, {0, 2}}, {{0, 0}, {0, 0}, {0, 0}, {0, 0}}, {{0, 0}, {0, 0}, {0, 0}, {0, 0}}},       2, 1}, // 長條型
+     {{{{0, -1}, {1, -1}, {0, 0}, {1, 0}}, {{0, 0}, {0, 0}, {0, 0}, {0, 0}}, {{0, 0}, {0, 0}, {0, 0}, {0, 0}}, {{0, 0}, {0, 0}, {0, 0}, {0, 0}}},       1, 2}, // 正方形
+     {{{{-1, -1}, {-1, 0}, {0, 0}, {1, 0}}, {{-1, 1}, {0, 1}, {0, 0}, {0, -1}}, {{-1, 0}, {0, 0}, {1, 0}, {1, 1}}, {{1, -1}, {0, -1}, {0, 0}, {0, 1}}}, 4, 3}, //
+     {{{{-1, 0}, {0, 0}, {0, 1}, {1, 1}}, {{0, -1}, {0, 0}, {-1, 0}, {-1, 1}}, {{0, 0}, {0, 0}, {0, 0}, {0, 0}}, {{0, 0}, {0, 0}, {0, 0}, {0, 0}}},     2, 4},
+     {{{{-1, 0}, {0, 0}, {1, 0}, {1, -1}}, {{-1, -1}, {0, -1}, {0, 0}, {0, 1}}, {{-1, 1}, {-1, 0}, {0, 0}, {1, 0}}, {{0, -1}, {0, 0}, {0, 1}, {1, 1}}}, 4, 5},
+     {{{{-1, 1}, {0, 1}, {0, 0}, {1, 0}}, {{0, -1}, {0, 0}, {1, 0}, {1, 1}}, {{0, 0}, {0, 0}, {0, 0}, {0, 0}}, {{0, 0}, {0, 0}, {0, 0}, {0, 0}}},       2, 6},
+     {{{{-1, 0}, {0, 0}, {1, 0}, {0, -1}}, {{0, -1}, {0, 0}, {0, 1}, {-1, 0}}, {{-1, 0}, {0, 0}, {1, 0}, {0, 1}}, {{0, -1}, {0, 0}, {0, 1}, {1, 0}}},   4, 7}
 };
+/* #endregion */
 
-struct Block {
-    Point square[4][4];
-    int   numRotate, color;
-};
+/* #region  動態變數 */
+Point_t pos;       // 當前積木座標
+Block_t block;     // 當前積木
+int     rot     = 0;
+bool    started = false, gameover = false;
 
-typedef enum
-{
-    ATM_BTN_PRE,
-    ATM_BTN_REL,
-} ATM_BTN_STATE_E;
+boolean btn_AB     = false;               // 觸發積木 旋轉
+boolean btn_LEFT   = false;               // 觸發積木 往左
+boolean btn_RIGHT  = false;               // 觸發積木 往右
+int     game_speed = GAME_INIT_SPEED;     // 下降速度
 
-Point pos;
-Block block;
-int   rot, fall_cnt = 0;
-bool  started = false, gameover = false;
-
-boolean but_A = false, but_LEFT = false, but_RIGHT = false;
-
-int   game_speed = 20;     // 25msec
-Block blocks[7]  = {
-      {{{{-1, 0}, {0, 0}, {1, 0}, {2, 0}}, {{0, -1}, {0, 0}, {0, 1}, {0, 2}}, {{0, 0}, {0, 0}, {0, 0}, {0, 0}}, {{0, 0}, {0, 0}, {0, 0}, {0, 0}}},       2, 1},
-      {{{{0, -1}, {1, -1}, {0, 0}, {1, 0}}, {{0, 0}, {0, 0}, {0, 0}, {0, 0}}, {{0, 0}, {0, 0}, {0, 0}, {0, 0}}, {{0, 0}, {0, 0}, {0, 0}, {0, 0}}},       1, 2},
-      {{{{-1, -1}, {-1, 0}, {0, 0}, {1, 0}}, {{-1, 1}, {0, 1}, {0, 0}, {0, -1}}, {{-1, 0}, {0, 0}, {1, 0}, {1, 1}}, {{1, -1}, {0, -1}, {0, 0}, {0, 1}}}, 4, 3},
-      {{{{-1, 0}, {0, 0}, {0, 1}, {1, 1}}, {{0, -1}, {0, 0}, {-1, 0}, {-1, 1}}, {{0, 0}, {0, 0}, {0, 0}, {0, 0}}, {{0, 0}, {0, 0}, {0, 0}, {0, 0}}},     2, 4},
-      {{{{-1, 0}, {0, 0}, {1, 0}, {1, -1}}, {{-1, -1}, {0, -1}, {0, 0}, {0, 1}}, {{-1, 1}, {-1, 0}, {0, 0}, {1, 0}}, {{0, -1}, {0, 0}, {0, 1}, {1, 1}}}, 4, 5},
-      {{{{-1, 1}, {0, 1}, {0, 0}, {1, 0}}, {{0, -1}, {0, 0}, {1, 0}, {1, 1}}, {{0, 0}, {0, 0}, {0, 0}, {0, 0}}, {{0, 0}, {0, 0}, {0, 0}, {0, 0}}},       2, 6},
-      {{{{-1, 0}, {0, 0}, {1, 0}, {0, -1}}, {{0, -1}, {0, 0}, {0, 1}, {-1, 0}}, {{-1, 0}, {0, 0}, {1, 0}, {0, 1}}, {{0, -1}, {0, 0}, {0, 1}, {1, 0}}},   4, 7}
-};
-extern uint8_t tetris_img[];
-#define GREY 0x5AEB
+// 紀錄按鍵狀態，避免重複觸發
 int pom  = 0;
 int pom2 = 0;
 int pom3 = 0;
-int pom4 = 0;
 
 int score = 0;
 int lvl   = 1;
 
-CircusUart      uart(Serial);
 ATM_BTN_STATE_E btn_b_state = ATM_BTN_REL;
 ATM_BTN_STATE_E btn_a_state = ATM_BTN_REL;
+/* #endregion */
 
+/* #region  Object */
+TFT_eSPI   tft = TFT_eSPI();
+CircusUart uart(Serial);
+/* #endregion */
+
+/* #region  Arduino Setup */
 void setup(void)
 {
     Serial.begin(UART_BAUDRATE);
 
+    /* #region  註冊按鍵事件 */
     uart.on(ATM_EVN_BTN_A_PRE, '\0', [](const char *temp) {
         btn_a_state = ATM_BTN_PRE;
     });
@@ -79,40 +84,48 @@ void setup(void)
     uart.on(ATM_EVN_BTN_B_REL, '\0', [](const char *temp) {
         btn_b_state = ATM_BTN_REL;
     });
+    /* #endregion */
 
+    /* #region  初始化 TFT */
     tft.init();
     tft.setRotation(3);
     tft.setSwapBytes(true);
 
+    /* #endregion */
+    /* #region  初始化 SPIFFS */
     if (!SPIFFS.begin()) {
-        // DEBUG_PRINTLN(F("SPIFFS initialisation failed!"));
         tft.fillScreen(TFT_BLACK);
         tft.setTextColor(TFT_RED);
         tft.drawString(String("SPIFFS FAILED"), 30, 55, 4);
         while (1)
             yield();
     }
-    // DEBUG_PRINTLN(F("\r\nSPIFFS Initialisation done."));
+    /* #endregion */
 
-    // TJpgDec
+    /* #region  設定 TJpgDec 比例、解碼 Callback*/
     TJpgDec.setJpgScale(1);
     TJpgDec.setCallback(onTJpgDecoded);
+    /* #endregion */
 
+    /* #region  顯示遊戲開機畫面 */
     tft.pushImage(52, 0, 135, 240, tet);
     delay(3000);
+    /* #endregion */
+
+    /* #region TODO: 顯示遊戲左右 */
     // tft.fillScreen(TFT_BLACK);
     // TJpgDec.drawFsJpg(0, 0, "/tetris.jpg");
     // delay(3000);
+    /* #endregion */
 
+    /* #region  繪製遊戲邊框 */
     tft.fillScreen(TFT_BLACK);
     tft.drawLine(35, 19, 201, 19, GREY);
     tft.drawLine(35, 19, 35, 240, GREY);
     tft.drawLine(201, 19, 201, 240, GREY);
+    /* #endregion */
 
-    tft.drawString("SCORE:" + String(score), 38, 8, 1);
-    tft.drawString("LVL:" + String(lvl), 167, 8, 1);
-
-    //----------------------------// Make Block ----------------------------
+    /* #region  繪製積木顏色 */
     make_block(0, TFT_BLACK);     // Type No, Color
     make_block(1, 0x00F0);        // DDDD     RED
     make_block(2, 0xFBE4);        // DD,DD    PUPLE
@@ -121,73 +134,66 @@ void setup(void)
     make_block(5, 0x87FF);        // __D,DDD  YELLO
     make_block(6, 0xF00F);        // _DD,DD_  LIGHT GREEN
     make_block(7, 0xF8FC);        // _D_,DDD  PINK
-    //----------------------------------------------------------------------
-
-    PutStartPos();     // Start Position
-    for (int i = 0; i < 4; ++i)
-        screen[pos.X + block.square[rot][i].X][pos.Y + block.square[rot][i].Y] = block.color;
-    Draw();     // Draw block
+    /* #endregion */
+    initGame();
 }
-//========================================================================
+/* #endregion */
+
+/* #region  Arduino Loop */
 void loop()
 {
+    static uint32_t update_timer = 0;
+    // polling ATmega328P even
     uart.loop();
-    if (gameover) {
-        if (btn_b_state == ATM_BTN_PRE) {
-            for (int j = 0; j < Height; ++j)
-                for (int i = 0; i < Width; ++i)
-                    screen[i][j] = 0;
-            gameover   = false;
-            score      = 0;
-            game_speed = 20;
-            lvl        = 1;
-            PutStartPos();     // Start Position
-            for (int i = 0; i < 4; ++i)
-                screen[pos.X + block.square[rot][i].X][pos.Y + block.square[rot][i].Y] = block.color;
-            tft.drawString("SCORE:" + String(score), 38, 8, 1);
-            tft.drawString("LVL:" + String(lvl), 167, 8, 1);
-            Draw();
-        }
+
+    if (gameover && btn_b_state == ATM_BTN_PRE) {
+        initGame();
         return;
     }
 
-    static uint32_t timer = 0;
-    if (gameover == false) {
-        if (millis() > timer) {
-            timer = millis() + game_speed;
-            Point next_pos;
-            int   next_rot = rot;
+    if (!gameover) {
+        if (millis() > update_timer) {
+            Point_t next_pos;
+            int     next_rot = rot;
             GetNextPosRot(&next_pos, &next_rot);
+            update_timer = millis() + 20;
             ReviseScreen(next_pos, next_rot);
-            // delay(game_speed);
-        }     // SPEED ADJUST
+        }
     }
 }
-//========================================================================
+/* #endregion */
+
+/* #region  更新 backBuffer，繪製 backBuffer 到 TFT */
 void Draw()
-{     // Draw 120x240 in the center
-    for (int i = 0; i < Width; ++i)
-        for (int j = 0; j < Height; ++j)
-            for (int k = 0; k < Length; ++k)
-                for (int l = 0; l < Length; ++l)
+{                                                    // Draw 120x240 in the center
+    for (int i = 0; i < Width; ++i)                  // 水平尋訪 square
+        for (int j = 0; j < Height; ++j)             // 垂直尋訪 square
+            for (int k = 0; k < Length; ++k)         // 垂直尋訪 square 中 Pixel
+                for (int l = 0; l < Length; ++l)     // 水平尋訪 square 中 Pixel
+                                                     // 設定 backBuffer 每一點像素言顏色
                     backBuffer[j * Length + l][i * Length + k] = BlockImage[screen[i][j]][k][l];
+    // 顯示 backBuffer 到 TFT
     tft.pushImage(36, 20, 165, 220, *backBuffer);
 }
-//========================================================================
+/* #endregion */
+
+/* #region  初始化遊戲機木 */
 void PutStartPos()
 {
-    game_speed = 20;
-    pos.X      = 4;
-    pos.Y      = 1;
-    block      = blocks[random(7)];
-    rot        = random(block.numRotate);
+    game_speed = GAME_INIT_SPEED;
+    pos.X      = 7;                           // 初始化積木 X 座標，遊戲區正中間 Width/2
+    pos.Y      = 1;                           // 初始化積木 Y 座標，遊戲區最上方
+    block      = blocks[random(7)];           // 隨機取積木
+    rot        = random(block.numRotate);     // 隨機設定方向
 }
-//========================================================================
-bool GetSquares(Block block, Point pos, int rot, Point *squares)
+/* #endregion */
+
+/* #region  檢查是否重疊或超出邊界 */
+bool GetSquares(Block_t block, Point_t pos, int rot, Point_t *squares)
 {
     bool overlap = false;
     for (int i = 0; i < 4; ++i) {
-        Point p;
+        Point_t p;
         p.X = pos.X + block.square[rot][i].X;
         p.Y = pos.Y + block.square[rot][i].Y;
         overlap |= p.X < 0 || p.X >= Width || p.Y < 0 || p.Y >= Height || screen[p.X][p.Y] != 0;
@@ -195,116 +201,131 @@ bool GetSquares(Block block, Point pos, int rot, Point *squares)
     }
     return !overlap;
 }
-//========================================================================
+/* #endregion */
+
+/* #region  遊戲結束、將所有積木設為統一顏色 */
 void GameOver()
 {
+    // 將所有區塊
     for (int i = 0; i < Width; ++i)
         for (int j = 0; j < Height; ++j)
             if (screen[i][j] != 0)
                 screen[i][j] = 4;
     gameover = true;
 }
-//========================================================================
+/* #endregion */
+
+/* #region  清除按鍵狀態 flag */
 void ClearKeys()
 {
-    but_A     = false;
-    but_LEFT  = false;
-    but_RIGHT = false;
+    btn_AB    = false;
+    btn_LEFT  = false;
+    btn_RIGHT = false;
 }
-//========================================================================
+/* #endregion */
 
+/* #region  根據按鍵狀態設定動作 flag */
 bool KeyPadLoop()
 {
+    // 按 A 放 B
     if (btn_b_state == ATM_BTN_REL && btn_a_state == ATM_BTN_PRE) {
         if (pom == 0) {
             pom = 1;
             ClearKeys();
-            but_LEFT = true;
+            btn_LEFT = true;
             return true;
         }
     } else {
         pom = 0;
     }
-
+    // 按 B 放 A
     if (btn_a_state == ATM_BTN_REL && btn_b_state == ATM_BTN_PRE) {
         if (pom2 == 0) {
             pom2 = 1;
             ClearKeys();
-            but_RIGHT = true;
+            btn_RIGHT = true;
             return true;
         }
     } else {
         pom2 = 0;
     }
-
-    // if (digitalRead(37) == 0) {
-    //     if (pom3 == 0) {
-    //         pom3 = 1;
-    //         ClearKeys();
-    //         but_A = true;
-    //         return true;
-    //     }
-    // } else {
-    //     pom3 = 0;
-    // }
-
+    // 按 A、B
     if (btn_a_state == ATM_BTN_PRE && btn_b_state == ATM_BTN_PRE) {
-        if (pom4 == 0) {
-            pom4 = 1;
+        if (pom3 == 0) {
+            pom3 = 1;
             ClearKeys();
-            but_A = true;
+            btn_AB = true;
             return true;
         }
     } else {
-        pom4 = 0;
+        pom3 = 0;
     }
 
     return false;
 }
-//========================================================================
-void GetNextPosRot(Point *pnext_pos, int *pnext_rot)
+/* #endregion */
+
+/* #region  取得下一個積木位置、旋轉方向 */
+void GetNextPosRot(Point_t *pnext_pos, int *pnext_rot)
 {
+    static uint32_t timer = 0;
+
     KeyPadLoop();
 
-    if (but_LEFT)
+    if (btn_LEFT)
+        // 遊戲開始
         started = true;
     if (!started)
+        // 遊戲已結束
         return;
+
     pnext_pos->X = pos.X;
     pnext_pos->Y = pos.Y;
-    if ((fall_cnt = (fall_cnt + 1) % 10) == 0)
+
+    if (millis() > timer) {
+        timer = millis() + game_speed;
         pnext_pos->Y += 1;
-    else if (1) {
-        if (but_LEFT) {
-            but_LEFT = false;
-            pnext_pos->X -= 1;
-        } else if (but_RIGHT) {
-            but_RIGHT = false;
-            pnext_pos->X += 1;
-        } else if (but_A) {
-            but_A      = false;
-            *pnext_rot = (*pnext_rot + block.numRotate - 1) % block.numRotate;
-        }
+    }
+
+    if (btn_LEFT) {
+        btn_LEFT = false;
+        // 往左一格
+        pnext_pos->X -= 1;
+    } else if (btn_RIGHT) {
+        btn_RIGHT = false;
+        // 往右一格
+        pnext_pos->X += 1;
+    } else if (btn_AB) {
+        btn_AB = false;
+        // 往左旋轉
+        *pnext_rot = (*pnext_rot + block.numRotate - 1) % block.numRotate;
     }
 }
-//========================================================================
-void DeleteLine()
+/* #endregion */
+
+/* #region  檢查並消除整行 */
+void ChkDeleteLine()
 {
+    // 尋訪 screen row
     for (int j = 0; j < Height; ++j) {
         bool Delete = true;
+        //
+        // 尋訪 screen col，檢整行是否都有積木
         for (int i = 0; i < Width; ++i)
             if (screen[i][j] == 0)
                 Delete = false;
         if (Delete) {
+            // 增加分數
             score++;
-            if (score % 5 == 0) {
+            // 難度升級，下降速度加快
+            if (score % UpgradeThreshold == 0) {
                 lvl++;
-                game_speed = game_speed - 4;
-                tft.drawString("LVL:" + String(lvl), 151, 8, 1);
+                game_speed = game_speed - SpeedReduction;
+                tft.drawString("LVL:" + String(lvl), 167, 8, 1);
             }
-            tft.drawString("SCORE:" + String(score), 77, 8, 1);
+            tft.drawString("SCORE:" + String(score), 38, 8, 1);
+            // 從下到上更新積木
             for (int k = j; k >= 1; --k) {
-
                 for (int i = 0; i < Width; ++i) {
                     screen[i][k] = screen[i][k - 1];
                 }
@@ -312,46 +333,92 @@ void DeleteLine()
         }
     }
 }
-//========================================================================
-void ReviseScreen(Point next_pos, int next_rot)
+/* #endregion */
+
+/* #region  修改 Screen */
+void ReviseScreen(Point_t next_pos, int next_rot)
 {
     if (!started)
         return;
-    Point next_squares[4];
+    Point_t next_squares[4];
+    // 清除積木四個區塊顏色
     for (int i = 0; i < 4; ++i)
         screen[pos.X + block.square[rot][i].X][pos.Y + block.square[rot][i].Y] = 0;
+
     if (GetSquares(block, next_pos, next_rot, next_squares)) {
+        // 無重疊或超出邊界
         for (int i = 0; i < 4; ++i) {
             screen[next_squares[i].X][next_squares[i].Y] = block.color;
         }
         pos = next_pos;
         rot = next_rot;
     } else {
+        // 重疊或超出邊界
+        // 回填積木四個區塊顏色
         for (int i = 0; i < 4; ++i)
             screen[pos.X + block.square[rot][i].X][pos.Y + block.square[rot][i].Y] = block.color;
+        // 檢查積木 Y 座標是否到底
         if (next_pos.Y == pos.Y + 1) {
-            DeleteLine();
+            ChkDeleteLine();
             PutStartPos();
             if (!GetSquares(block, pos, rot, next_squares)) {
+                // 設定新積木
                 for (int i = 0; i < 4; ++i)
                     screen[pos.X + block.square[rot][i].X][pos.Y + block.square[rot][i].Y] = block.color;
+                // 積木已重疊，遊戲結束
                 GameOver();
             }
         }
     }
     Draw();
 }
-//========================================================================
+/* #endregion */
+
+/* #region  繪製積木顏色、分隔線 */
 void make_block(int n, uint16_t color)
-{     // Make Block color
-    for (int i = 0; i < 12; i++)
-        for (int j = 0; j < 12; j++) {
-            BlockImage[n][i][j] = color;     // Block color
-            if (i == 0 || j == 0)
-                BlockImage[n][i][j] = 0;     // TFT_BLACK Line
+{     // Make Block_t color
+    for (int i = 0; i < Block_SIEZ; i++)
+        for (int j = 0; j < Block_SIEZ; j++) {
+            BlockImage[n][i][j] = color;
+            if (i == 0 || j == 0) {
+                // 設定正方形區隔線
+                BlockImage[n][i][j] = 0;
+            }
         }
 }
-//========================================================================
+/* #endregion */
+
+/* #region  初始化遊戲 */
+void initGame()
+{
+    // 清除 screen 內容
+    for (int j = 0; j < Height; ++j)
+        for (int i = 0; i < Width; ++i)
+            screen[i][j] = 0;
+    // 動態變數初始化
+    gameover   = false;
+    score      = 0;
+    game_speed = GAME_INIT_SPEED;
+    lvl        = 1;
+    // 產生心積木
+    PutStartPos();
+    /*  根據當前旋轉方向(rot)選擇 Block_t 內其中一種方向積木，
+        取得 X 座標(block.square[rot][i].X)加上 X 開始座標(pos.X)，
+        取得 Y 座標(block.square[rot][i].Y)加上 Y 開始座標(pos.Y)，
+        設定積木顏色 index 到積木空間 buff(screen)內
+    */
+    for (int i = 0; i < 4; ++i)
+        screen[pos.X + block.square[rot][i].X][pos.Y + block.square[rot][i].Y] = block.color;
+    // 繪製分數、難度等級
+    tft.drawString("SCORE:" + String(score), 38, 8, 1);
+    tft.drawString("LVL:" + String(lvl), 167, 8, 1);
+
+    // 繪製所有積木到 TFT
+    Draw();
+}
+/* #endregion */
+
+/* #region  jpg 解碼完成 Callback */
 bool onTJpgDecoded(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t *bitmap)
 {
     if (y >= tft.height())
@@ -360,3 +427,4 @@ bool onTJpgDecoded(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t *bitma
     tft.pushImage(x, y, w, h, bitmap);
     return 1;
 }
+/* #endregion */
