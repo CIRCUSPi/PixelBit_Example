@@ -47,6 +47,7 @@ boolean btn_RIGHT  = false;               // 觸發積木 往右
 int     game_speed = GAME_INIT_SPEED;     // 下降速度
 
 // 紀錄按鍵狀態，避免重複觸發
+// TODO: 將按鍵觸發狀態細分，並交由 328P 處理
 int pom  = 0;
 int pom2 = 0;
 int pom3 = 0;
@@ -177,7 +178,7 @@ void Draw()
 }
 /* #endregion */
 
-/* #region  初始化遊戲機木 */
+/* #region  初始化遊戲積木 */
 void PutStartPos()
 {
     game_speed = GAME_INIT_SPEED;
@@ -395,12 +396,12 @@ void initGame()
     for (int j = 0; j < Height; ++j)
         for (int i = 0; i < Width; ++i)
             screen[i][j] = 0;
-    // 動態變數初始化
+    // 變數初始化
     gameover   = false;
     score      = 0;
     game_speed = GAME_INIT_SPEED;
     lvl        = 1;
-    // 產生心積木
+    // 產生新積木
     PutStartPos();
     /*  根據當前旋轉方向(rot)選擇 Block_t 內其中一種方向積木，
         取得 X 座標(block.square[rot][i].X)加上 X 開始座標(pos.X)，
