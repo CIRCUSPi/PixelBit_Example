@@ -130,7 +130,6 @@ void loop()
     static int ii;
     static int btn_a_stat = BTN_LVL_RELEASE, btn_b_stat = BTN_LVL_RELEASE;
 
-    serialEvent();
     // check the command
     if (stringComplete) {
         for (ii = 0; cmd_list[ii].len != 0; ii++) {
