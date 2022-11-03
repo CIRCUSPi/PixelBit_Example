@@ -12,7 +12,7 @@ const char INDEX_HTML[] = R"rawliteral(
 
 <head>
     <meta charset="utf-8">
-    <title>PixelBit FPV RockBot</title>
+    <title>PixelBit FPV Moon Car</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body {
@@ -60,7 +60,7 @@ const char INDEX_HTML[] = R"rawliteral(
 </head>
 
 <body>
-    <h1>高雄市瑞祥國小</h1>
+    <h1>PixelBit FPV Moon Car</h1>
     <img src="" id="photo">
     <table>
         <tr>
