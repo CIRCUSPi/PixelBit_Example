@@ -7,7 +7,7 @@
 #define WIFI_STA_MODE 1
 
 #define WIFI_MODE WIFI_AP_MODE
-#define WIFI_SSID "PixelBit"
+#define WIFI_SSID "PixelBit_Rockbot"
 #define WIFI_PASS "circuspi"
 
 #define QRCODE_VERSION 3 /* 3: 29x29, 4: 33x33, 5: 37x37 */
