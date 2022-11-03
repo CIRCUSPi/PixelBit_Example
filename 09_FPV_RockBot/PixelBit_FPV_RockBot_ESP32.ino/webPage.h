@@ -11,6 +11,7 @@ const char INDEX_HTML[] = R"rawliteral(
 <html>
 
 <head>
+    <meta charset="utf-8">
     <title>PixelBit FPV RockBot</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
